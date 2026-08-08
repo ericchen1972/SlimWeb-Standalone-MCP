@@ -1,0 +1,45 @@
+name: Deploy Standalone MCP Candidate
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: webless-489821
+  REGION: asia-east1
+  SERVICE: slimweb-standalone-mcp
+  ARTIFACT_REPOSITORY: cloud-run-source-deploy
+
+jobs:
+  deploy-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+      - name: Build and push
+        run: |
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/${SERVICE}:${GITHUB_SHA}"
+          docker build -t "${IMAGE}" .
+          docker push "${IMAGE}"
+      - name: Deploy no-traffic candidate
+        run: |
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPOSITORY}/${SERVICE}:${GITHUB_SHA}"
+          gcloud run deploy "${SERVICE}" \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --platform=managed \
+            --image="${IMAGE}" \
+            --no-traffic \
+            --tag=candidate \
+            --timeout=60 \
+            --set-env-vars="NODE_ENV=production,PUBLIC_BASE_URL=https://standalone-mcp.slimweb.tw,WEBLESS_REGISTRY_BASE_URL=https://slimweb.tw,GOOGLE_CLIENT_ID=27587628711-upin8ch154kqrl88k41978q660oc0pbg.apps.googleusercontent.com" \
+            --set-secrets="MCP_SESSION_SECRET=MCP_SESSION_SECRET:latest,WEBLESS_MCP_SECRET=WEBLESS_MCP_SECRET:latest" \
+            --allow-unauthenticated \
+            --quiet
