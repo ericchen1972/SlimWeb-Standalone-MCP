@@ -31,6 +31,31 @@ test('backend exchanges central credential for a route-scoped merchant token', a
   assert.equal(requests[1].options.redirect, 'manual');
 });
 
+test('backend transport derives the Domain only from signed resource identity', async () => {
+  const requests = [];
+  const backend = new StandaloneBackend({
+    registryBaseUrl: 'https://slimweb.tw',
+    secret: 'central-secret',
+    lookupImpl: async () => [{ address: '203.0.113.10', family: 4 }],
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      if (requests.length === 1) return jsonResponse(200, { ok: true, data: { origin: 'https://shop.example.com', token: 'bridge-token' } });
+      return jsonResponse(200, { ok: true, data: { settings: { name: 'Demo' } } });
+    }
+  });
+
+  const result = await backend.request({
+    identity: { google_id: 'owner-sub', email: 'owner@example.com', resource_context: 'shop.example.com' },
+    tool: 'slimweb_settings_get',
+    permission: 'basic_settings',
+    method: 'GET',
+    path: '/internal/mcp/v1/sites/swcb_demo/settings/basic'
+  });
+
+  assert.equal(result.settings.name, 'Demo');
+  assert.equal(JSON.parse(requests[0].options.body).domain, 'shop.example.com');
+});
+
 test('backend rejects a production hostname resolving to a private address', async () => {
   let calls = 0;
   const backend = new StandaloneBackend({

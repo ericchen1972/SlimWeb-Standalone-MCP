@@ -6,6 +6,12 @@ export class BackendError extends Error { constructor(message, code = 'UPSTREAM_
 export class StandaloneBackend {
   constructor({ registryBaseUrl, secret, fetchImpl = fetch, lookupImpl = lookup, timeoutMs = 15000 }) { this.registryBaseUrl = registryBaseUrl.replace(/\/+$/, ''); this.secret = secret; this.fetch = fetchImpl; this.lookup = lookupImpl; this.timeoutMs = timeoutMs; }
 
+  async request({ identity, tool, permission, method = 'GET', path, body, idempotencyKey }) {
+    const domain = String(identity?.resource_context ?? '').trim();
+    if (domain === '') throw new BackendError('Standalone Domain context is required.', 'DOMAIN_REQUIRED');
+    return this.call(domain, identity, tool, permission, method, path, body, idempotencyKey);
+  }
+
   async call(domain, identity, tool, permission, method, path, body, idempotencyKey) {
     const requestId = randomUUID();
     const scope = await this.json(`${this.registryBaseUrl}/internal/standalone/mcp/v1/bridge-token`, { method: 'POST', headers: { 'content-type': 'application/json', 'X-SlimWeb-MCP-Secret': this.secret, 'X-Request-Id': requestId }, body: JSON.stringify({ domain, actor: { google_sub: identity.google_id ?? identity.google_sub ?? '', email: identity.email ?? '' }, tool, permission, method, path, request_id: requestId }) });
