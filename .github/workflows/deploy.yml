@@ -40,7 +40,7 @@ jobs:
             --tag=candidate \
             --timeout=60 \
             --service-account="slimweb-standalone-mcp@${PROJECT_ID}.iam.gserviceaccount.com" \
-            --set-env-vars="NODE_ENV=production,PUBLIC_BASE_URL=https://slimweb-standalone-mcp-27587628711.asia-east1.run.app,WEBLESS_REGISTRY_BASE_URL=https://slimweb.tw,GOOGLE_CLIENT_ID=27587628711-upin8ch154kqrl88k41978q660oc0pbg.apps.googleusercontent.com" \
-            --set-secrets="MCP_SESSION_SECRET=MCP_SESSION_SECRET:latest,WEBLESS_MCP_SECRET=WEBLESS_MCP_SECRET:latest" \
+            --set-env-vars="NODE_ENV=production,PUBLIC_BASE_URL=https://slimweb-standalone-mcp-27587628711.asia-east1.run.app,WEBLESS_REGISTRY_BASE_URL=https://slimweb.tw,GOOGLE_CLIENT_ID=27587628711-upin8ch154kqrl88k41978q660oc0pbg.apps.googleusercontent.com,STANDALONE_SLIMAI_ASSERTION_ISSUER=https://slimweb.tw" \
+            --set-secrets="MCP_SESSION_SECRET=MCP_SESSION_SECRET:latest,WEBLESS_MCP_SECRET=WEBLESS_MCP_SECRET:latest,STANDALONE_SLIMAI_ASSERTION_PUBLIC_KEYS_JSON=STANDALONE_SLIMAI_ASSERTION_PUBLIC_KEYS_JSON:latest" \
             --allow-unauthenticated \
             --quiet
