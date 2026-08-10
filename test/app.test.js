@@ -121,3 +121,26 @@ test('Standalone tool list follows the capabilities returned by its Domain backe
     assert.equal(settings.inputSchema.properties.logo.type, 'object');
   });
 });
+
+test('Standalone exposes the complete core profile only for a full-contract backend', async () => {
+  const backend = new FakeBackend([
+    'site_context', 'basic_settings_read', 'basic_settings_write', 'full_contract_v1'
+  ]);
+  await withServer(backend, async (baseUrl) => {
+    const login = await fetch(`${baseUrl}/auth/google?domain=shop.example.com`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ credential: 'test' })
+    });
+    const token = (await login.json()).session.access_token;
+    const listed = await mcp(baseUrl, token, 'shop.example.com', 'tools/list');
+    const names = listed.payload.result.tools.map(({ name }) => name);
+
+    for (const name of [
+      'slimweb_settings_update', 'slimweb_products_upsert', 'slimweb_pages_create',
+      'slimweb_uploads_create', 'slimweb_themes_create_from_default',
+      'slimweb_orders_list', 'slimweb_posters_create'
+    ]) {
+      assert.ok(names.includes(name), `${name} should be enabled for full_contract_v1`);
+    }
+    assert.ok(names.length > 100);
+  });
+});

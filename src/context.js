@@ -1,10 +1,17 @@
 import { SlimWebBackendRepository } from '@slimweb/mcp-core/backend-repository';
 import { createCapabilityToolProfile } from '@slimweb/mcp-core/capability-profile';
+import { createToolProfile } from '@slimweb/mcp-core/tool-profile';
 
 import { StandaloneBackend } from './backend.js';
 import { createDomainContext } from './domainContext.js';
 
 const PHASE1_CAPABILITIES = ['site_context', 'basic_settings_read', 'basic_settings_write'];
+
+function profileForCapabilities(capabilities) {
+  return capabilities.includes('full_contract_v1')
+    ? createToolProfile()
+    : createCapabilityToolProfile(capabilities);
+}
 
 export function createStandaloneContext(options = {}) {
   const backend = options.backend ?? new StandaloneBackend({
@@ -47,7 +54,7 @@ export function createStandaloneContext(options = {}) {
     toolProfileResolver: async ({ identity, resourceContext: requestDomain }) => {
       if (!identity) return createCapabilityToolProfile(PHASE1_CAPABILITIES);
       const domain = identity.resource_context ?? requestDomain;
-      return createCapabilityToolProfile(await loadCapabilities(domain, identity));
+      return profileForCapabilities(await loadCapabilities(domain, identity));
     }
   };
 }
