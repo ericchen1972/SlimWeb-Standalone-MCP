@@ -142,5 +142,8 @@ test('Standalone exposes the complete core profile only for a full-contract back
       assert.ok(names.includes(name), `${name} should be enabled for full_contract_v1`);
     }
     assert.ok(names.length > 100);
+    const mailDelivery = listed.payload.result.tools.find(({ name }) => name === 'slimweb_mail_delivery_settings_update');
+    assert.equal(mailDelivery.inputSchema.properties.use_ai_marketing_email.type, 'boolean');
+    assert.equal(mailDelivery.inputSchema.properties.ai_marketing_email_interval_days.minimum, 7);
   });
 });
