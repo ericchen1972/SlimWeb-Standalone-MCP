@@ -136,12 +136,18 @@ test('Standalone exposes the complete core profile only for a full-contract back
 
     for (const name of [
       'slimweb_settings_update', 'slimweb_products_upsert', 'slimweb_pages_create',
-      'slimweb_uploads_create', 'slimweb_themes_create_from_default',
+      'slimweb_uploads_create', 'slimweb_themes_create_from_default', 'slimweb_themes_create_from_theme',
       'slimweb_orders_list', 'slimweb_posters_create'
     ]) {
       assert.ok(names.includes(name), `${name} should be enabled for full_contract_v1`);
     }
     assert.ok(names.length > 100);
+    const createDefault = listed.payload.result.tools.find(({ name }) => name === 'slimweb_themes_create_from_default');
+    const clone = listed.payload.result.tools.find(({ name }) => name === 'slimweb_themes_create_from_theme');
+    const rootUpdate = listed.payload.result.tools.find(({ name }) => name === 'slimweb_themes_update_root_elements');
+    assert.match(createDefault.description, /does not copy any Default root/i);
+    assert.deepEqual(clone.inputSchema.required, ['site_code', 'source_theme_id', 'name']);
+    assert.equal(rootUpdate.inputSchema.properties.confirmed_active_theme_edit.type, 'boolean');
     const mailDelivery = listed.payload.result.tools.find(({ name }) => name === 'slimweb_mail_delivery_settings_update');
     assert.equal(mailDelivery.inputSchema.properties.use_ai_marketing_email.type, 'boolean');
     assert.equal(mailDelivery.inputSchema.properties.ai_marketing_email_interval_days.minimum, 7);

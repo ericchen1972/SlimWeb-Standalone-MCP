@@ -4,6 +4,8 @@ Domain-scoped remote MCP shell for independent SlimWeb Standalone installations.
 
 Backends that advertise the original Phase 1 capability set receive exactly five tools: authentication status, site list, site selection, basic-settings read, and website-name update. A backend receives the complete `@slimweb/mcp-core` tool profile only after it advertises `full_contract_v1` together with the required Phase 1 capabilities. This service has no merchant database, filesystem, FTP, GCS, or object-storage credentials.
 
+For full-contract Theme work, Default is immutable. `slimweb_themes_create_from_default` creates a custom Theme without copying Default root storage, while `slimweb_themes_create_from_theme` clones only an explicit non-Default Theme shell/profile. Active custom Theme root/profile writes require `confirmed_active_theme_edit: true` after explicit user confirmation.
+
 SlimAI authenticates with a Webless-issued RS256 assertion bound to one registered installation and Domain. The hosted service validates that assertion and converts it into a request-local core session; `MCP_SESSION_SECRET` is never distributed to Standalone installations or returned to callers.
 
 Required runtime configuration:

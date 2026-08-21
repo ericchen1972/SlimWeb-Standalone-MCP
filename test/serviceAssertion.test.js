@@ -52,13 +52,16 @@ test('verifies a short-lived Webless assertion bound to one Domain and instance'
 });
 
 test('rejects wrong audience, Domain, instance shape, expiry, algorithm, and signature', () => {
+  const validToken = assertion();
+  const [validHeader, validClaims, validSignature] = validToken.split('.');
+  const corruptedSignature = `${validSignature[0] === 'A' ? 'B' : 'A'}${validSignature.slice(1)}`;
   for (const [token, expected, domain = '192.168.0.188'] of [
     [assertion({ aud: 'https://wrong.example' }), 'SERVICE_ASSERTION_AUDIENCE_INVALID'],
     [assertion(), 'SERVICE_ASSERTION_DOMAIN_MISMATCH', 'other.example.com'],
     [assertion({ instance_id: 0 }), 'SERVICE_ASSERTION_CLAIMS_INVALID'],
     [assertion({ iat: NOW - 60, exp: NOW - 1 }), 'SERVICE_ASSERTION_EXPIRED'],
     [assertion({}, { alg: 'HS256' }), 'SERVICE_ASSERTION_ALGORITHM_INVALID'],
-    [`${assertion().slice(0, -1)}x`, 'SERVICE_ASSERTION_SIGNATURE_INVALID']
+    [`${validHeader}.${validClaims}.${corruptedSignature}`, 'SERVICE_ASSERTION_SIGNATURE_INVALID']
   ]) {
     assert.throws(
       () => verifyServiceAssertion(token, { ...options, domain }),
