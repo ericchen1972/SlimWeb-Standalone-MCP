@@ -6,6 +6,8 @@ Backends that advertise the original Phase 1 capability set receive exactly five
 
 For full-contract Theme work, Default is immutable. `slimweb_themes_create_from_default` creates a custom Theme without copying Default root storage, while `slimweb_themes_create_from_theme` clones only an explicit non-Default Theme shell/profile. Active custom Theme root/profile writes require `confirmed_active_theme_edit: true` after explicit user confirmation.
 
+For full-contract page work, HTML and executable JavaScript are separate inputs. Page JavaScript is stored only in the MCP-owned `assets/js/90-mcp-page.js`; `enabled_libraries` selects managed dependencies such as Swiper or GSAP. On update, omitting `content.javascript` preserves the current file, a non-empty value replaces it, and an empty string deletes it. `slimweb_pages_get_content` returns the source plus asset and conflict metadata so callers do not create competing animation files.
+
 SlimAI authenticates with a Webless-issued RS256 assertion bound to one registered installation and Domain. The hosted service validates that assertion and converts it into a request-local core session; `MCP_SESSION_SECRET` is never distributed to Standalone installations or returned to callers.
 
 Required runtime configuration:

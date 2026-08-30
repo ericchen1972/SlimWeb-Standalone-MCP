@@ -151,5 +151,14 @@ test('Standalone exposes the complete core profile only for a full-contract back
     const mailDelivery = listed.payload.result.tools.find(({ name }) => name === 'slimweb_mail_delivery_settings_update');
     assert.equal(mailDelivery.inputSchema.properties.use_ai_marketing_email.type, 'boolean');
     assert.equal(mailDelivery.inputSchema.properties.ai_marketing_email_interval_days.minimum, 7);
+    const pageRead = listed.payload.result.tools.find(({ name }) => name === 'slimweb_pages_get_content');
+    const pageCreate = listed.payload.result.tools.find(({ name }) => name === 'slimweb_pages_create');
+    const pageUpdate = listed.payload.result.tools.find(({ name }) => name === 'slimweb_pages_update');
+    assert.equal(pageCreate.inputSchema.properties.content.properties.javascript.type, 'string');
+    assert.equal(pageCreate.inputSchema.properties.content.properties.javascript.maxLength, 102400);
+    assert.match(pageCreate.description, /90-mcp-page\.js/i);
+    assert.match(pageUpdate.description, /omit.*preserve/i);
+    assert.match(pageUpdate.description, /empty.*delete/i);
+    assert.match(pageRead.description, /javascript_asset.*javascript_conflicts/i);
   });
 });
