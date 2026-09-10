@@ -162,3 +162,18 @@ test('Standalone exposes the complete core profile only for a full-contract back
     assert.match(pageRead.description, /javascript_asset.*javascript_conflicts/i);
   });
 });
+
+
+test('invoice tools require the installed backend invoice lifecycle capability', async () => {
+  for (const enabled of [false, true]) {
+    const capabilities = ['site_context', 'basic_settings_read', 'basic_settings_write', 'full_contract_v1'];
+    if (enabled) capabilities.push('invoice_lifecycle_v1');
+    await withServer(new FakeBackend(capabilities), async baseUrl => {
+      const login = await fetch(`${baseUrl}/auth/google?domain=shop.example.com`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ credential: 'test' }) });
+      const token = (await login.json()).session.access_token;
+      const listed = await mcp(baseUrl, token, 'shop.example.com', 'tools/list');
+      const invoiceTools = listed.payload.result.tools.filter(({name}) => name.startsWith('slimweb_invoice'));
+      assert.equal(invoiceTools.length, enabled ? 9 : 0);
+    });
+  }
+});

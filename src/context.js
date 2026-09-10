@@ -9,7 +9,10 @@ const PHASE1_CAPABILITIES = ['site_context', 'basic_settings_read', 'basic_setti
 
 function profileForCapabilities(capabilities) {
   return capabilities.includes('full_contract_v1')
-    ? createToolProfile()
+    ? createToolProfile({ excludedTools: capabilities.includes('invoice_lifecycle_v1') ? [] : [
+      'slimweb_invoice_settings_get', 'slimweb_invoice_settings_update',
+      ...['list', 'get', 'create', 'issue', 'sync', 'void', 'allowance'].map(action => `slimweb_invoices_${action}`)
+    ] })
     : createCapabilityToolProfile(capabilities);
 }
 
