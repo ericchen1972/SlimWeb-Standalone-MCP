@@ -26,3 +26,7 @@ NODE_ENV
 `STANDALONE_SLIMAI_ASSERTION_PUBLIC_KEYS_JSON` maps JWT `kid` values to PEM public keys or base64-encoded PEM public keys. `PUBLIC_BASE_URL` is also the required assertion audience.
 
 `main` deploys a no-traffic Cloud Run candidate. Production traffic must be promoted only after OAuth, Domain binding, tool contract, and reversible name-update checks pass.
+
+LINE integration tools require each `line_bot_settings_read/write`, `line_ai_settings_read/write`, and `line_rich_menus_read/write` capability, including on `full_contract_v1` backends. The gateway pins Core v0.1.12; deploy LINE backend support before deploying this gateway.
+
+Integration credentials are write-only. Read and update responses return `has_notion_token`, `has_notification_smtp_password`, and provider `settings.hasHashKey` / `hasHashIv` / `hasPassword` presence flags; clients must not expect saved secret values. Token/password fields in tool input schemas are writes, not returned values.

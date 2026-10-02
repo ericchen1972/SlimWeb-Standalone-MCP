@@ -177,3 +177,19 @@ test('invoice tools require the installed backend invoice lifecycle capability',
     });
   }
 });
+
+
+test('LINE tools require each installed backend capability even with full contract', async () => {
+  for (const enabled of [false,true]) {
+    const capabilities=['site_context','basic_settings_read','basic_settings_write','full_contract_v1'];
+    if(enabled) capabilities.push('line_bot_settings_read','line_rich_menus_write');
+    await withServer(new FakeBackend(capabilities),async baseUrl=>{
+      const login=await fetch(`${baseUrl}/auth/google?domain=shop.example.com`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({credential:'test'})});
+      const token=(await login.json()).session.access_token;
+      const listed=await mcp(baseUrl,token,'shop.example.com','tools/list');
+      const names=listed.payload.result.tools.filter(t=>t.name.startsWith('slimweb_line_')).map(t=>t.name);
+      assert.equal(names.length,enabled?4:0);
+      assert.ok(!names.includes('slimweb_line_bot_settings_update'));
+    });
+  }
+});
