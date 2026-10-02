@@ -32,3 +32,6 @@ LINE integration tools require each `line_bot_settings_read/write`, `line_ai_set
 Integration credentials are write-only. Read and update responses return `has_notion_token`, `has_notification_smtp_password`, and provider `settings.hasHashKey` / `hasHashIv` / `hasPassword` presence flags; clients must not expect saved secret values. Token/password fields in tool input schemas are writes, not returned values.
 
 LINE member push tools (Core v0.1.16): friends_stats, members_list, push_prepare/send/status. Follow/unfollow updates only existing member bindings; member filters exclude unfollow. All friends use broadcast; member targets use multicast. Always show immutable preview and all URLs and obtain final human confirmation before send. Unknown outcomes retry the same operation, not a new preparation. See ../SlimWeb-MCP-Core/docs/line-member-push-contract.md.
+
+### LINE Bot add-friend QR Code
+`slimweb_line_bot_qrcode_get` validates the configured Bot token/identity and returns a reusable site PNG (`media_path`, `qr_image_url`) and `add_friend_url`. Requires integration settings permission. No Token is returned. Replies may be disabled; AI/webhook readiness is not required. Keep the square aspect ratio and white quiet-zone and hyperlink the image for mobile users. Use existing page/theme tools for placement.
