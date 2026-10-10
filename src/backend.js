@@ -37,7 +37,7 @@ export class StandaloneBackend {
     let response;
     try { response = await this.fetch(url, { ...options, signal: controller.signal }); } catch { throw new BackendError('Standalone backend is unreachable.', 'INSTANCE_UNREACHABLE'); } finally { clearTimeout(timer); }
     let payload; try { payload = await response.json(); } catch { throw new BackendError('Backend returned invalid JSON.', 'UPSTREAM_INVALID_RESPONSE', response.status); }
-    if (!response.ok || payload?.ok !== true || !('data' in payload)) throw new BackendError(payload?.error?.message ?? 'Backend rejected the request.', payload?.error?.code ?? 'UPSTREAM_FAILED', response.status);
+    if (!response.ok || payload?.ok !== true || !('data' in payload)) throw Object.assign(new BackendError(payload?.error?.message ?? 'Backend rejected the request.', payload?.error?.code ?? 'UPSTREAM_FAILED', response.status), {details: payload?.error?.details ?? {}});
     return payload.data;
   }
 }

@@ -193,3 +193,24 @@ test('LINE tools require each installed backend capability even with full contra
     });
   }
 });
+
+test('site events require installed capability and retain Domain on subscriptions', async () => {
+ for(const enabled of [false,true]){
+  const backend=new FakeBackend(['site_context','basic_settings_read','basic_settings_write',...(enabled?['site_notifications_v1']:[])]);
+  const original=backend.call.bind(backend);
+  backend.call=async (...args)=>{
+   if(args[5].endsWith('/events/subscribe')){backend.calls.push({domain:args[0],path:args[5],body:args[6]});return {id:'sub_standalone',refreshBefore:null,cursor:null,truncated:false};}
+   return original(...args);
+  };
+  await withServer(backend,async base=>{
+   const login=await fetch(`${base}/auth/google?domain=shop.example.com`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({credential:'test'})});
+   const token=(await login.json()).session.access_token;
+   const listed=await mcp(base,token,'shop.example.com','events/list');assert.equal(listed.payload.result.events.length,enabled?1:0);
+   const p={name:'site.notification',arguments:{site_code:'swcb_demo'},delivery:{mode:'webhook',url:'https://receiver.example.com/callback',secret:'whsec_'+Buffer.alloc(32).toString('base64')}};
+   const sub=await mcp(base,token,'shop.example.com','events/subscribe',p);
+   if(enabled){assert.equal(sub.payload.result.id,'sub_standalone');assert.equal(backend.calls.at(-1).domain,'shop.example.com');assert.deepEqual(backend.calls.at(-1).body,p);}
+   else assert.equal(sub.payload.error.code,-32601);
+   const mismatch=await mcp(base,token,'other.example.com','events/subscribe',p);assert.equal(mismatch.response.status,401);
+  });
+ }
+});

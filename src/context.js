@@ -55,6 +55,7 @@ export function createStandaloneContext(options = {}) {
   return {
     accountRepository: new SlimWebBackendRepository({ transport: backend }),
     resourceContext,
+    eventsResolver: async (identity) => (await loadCapabilities(identity.resource_context, identity)).includes('site_notifications_v1'),
     toolProfile: createCapabilityToolProfile(PHASE1_CAPABILITIES),
     toolProfileResolver: async ({ identity, resourceContext: requestDomain }) => {
       if (!identity) return createCapabilityToolProfile(PHASE1_CAPABILITIES);
