@@ -7,6 +7,11 @@ import { createStandaloneRequestHandler } from '../src/server.js';
 test('standalone OAuth consent and PKCE preserve domain, reject cross-domain sessions', async () => {
   const state = new Map();
   const backend = {
+    async bootstrapIdentity({credential,resourceContext}) {
+      assert.equal(credential,'test');
+      assert.equal(resourceContext,'customer.example');
+      return {profile:{sub:'owner',email:'owner@example.com'},backend_grant:'independently-verified-oauth-fixture-grant'};
+    },
     async oauthState(method, kind, key, body) {
       const k = kind + key;
       if (method === 'PUT') {
@@ -17,7 +22,8 @@ test('standalone OAuth consent and PKCE preserve domain, reject cross-domain ses
       if (method === 'DELETE') state.delete(k);
       return row && row.expires_at > Date.now() / 1000 ? row.value : null;
     },
-    async request({ path }) {
+    async request({ path, identity }) {
+      assert.equal(identity.backend_grant,'independently-verified-oauth-fixture-grant');
       if (path.endsWith('/version'))
         return {
           contract: 'slimweb-backend',

@@ -5,6 +5,7 @@ import { test } from 'node:test';
 
 import { createStandaloneRequestHandler } from '../src/server.js';
 import { verifyServiceAssertion } from '../src/serviceAssertion.js';
+import {createSignedToken} from '@slimweb/mcp-core/session';
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const NOW = 1_786_322_400;
@@ -24,6 +25,7 @@ function assertion(overrides = {}, headerOverrides = {}) {
     domain: '192.168.0.188',
     sub: 'owner-sub',
     email: 'owner@example.com',
+    backend_grant: 'verified-backend-grant-fixture',
     name: 'Owner',
     jti: 'assertion-id-0001',
     iat: NOW,
@@ -70,7 +72,7 @@ test('rejects wrong audience, Domain, instance shape, expiry, algorithm, and sig
   }
 });
 
-test('converts a valid assertion into one request-local core session without exposing the core secret', async () => {
+test('verifies assertions into request-local identity without minting reusable credentials', async () => {
   const liveNow = Math.floor(Date.now() / 1000);
   const liveAssertion = () => assertion({ iat: liveNow, exp: liveNow + 60 });
   const calls = [];
@@ -121,7 +123,14 @@ test('converts a valid assertion into one request-local core session without exp
     );
     assert.equal(calls[0].identity.resource_context, '192.168.0.188');
     assert.equal(calls[0].identity.google_id, 'owner-sub');
+    assert.equal(calls[0].identity.backend_grant, 'verified-backend-grant-fixture');
+    assert.equal(response.headers.get('set-cookie'),null);
     assert.doesNotMatch(JSON.stringify(payload), /hosted-core-secret/);
+    assert.doesNotMatch(JSON.stringify(payload), /verified-backend-grant-fixture/);
+
+    const legacy=createSignedToken({typ:'session',email:'owner@example.com',resource_context:'192.168.0.188',exp:liveNow+3600},'hosted-core-secret-that-is-never-returned');
+    const rejected=await fetch(`${baseUrl}/mcp?domain=192.168.0.188`,{method:'POST',headers:{authorization:'Bearer '+legacy,'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:2,method:'tools/list'})});
+    assert.equal(rejected.status,401);
 
     const beforeMismatch = calls.length;
     const mismatch = await fetch(`${baseUrl}/mcp?domain=other.example.com`, {

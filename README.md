@@ -21,7 +21,16 @@ WEBLESS_MCP_SECRET
 STANDALONE_SLIMAI_ASSERTION_ISSUER
 STANDALONE_SLIMAI_ASSERTION_PUBLIC_KEYS_JSON
 NODE_ENV
+STANDALONE_TRUSTED_PRIVATE_ORIGINS
 ```
+
+Remote instance origins must be canonical HTTPS origins with public DNS answers.
+The transport pins the checked DNS answer to the socket and rejects redirects,
+credentials, custom ports and mixed public/private answers. To retain the
+registered BOBO instance, operators must explicitly set
+`STANDALONE_TRUSTED_PRIVATE_ORIGINS=http://192.168.0.188` on the gateway.
+This exact origin is the only supported private-network exception; the default
+is empty and other private origins are rejected.
 
 `STANDALONE_SLIMAI_ASSERTION_PUBLIC_KEYS_JSON` maps JWT `kid` values to PEM public keys or base64-encoded PEM public keys. `PUBLIC_BASE_URL` is also the required assertion audience.
 

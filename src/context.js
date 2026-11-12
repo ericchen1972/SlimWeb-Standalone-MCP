@@ -22,7 +22,8 @@ export function createStandaloneContext(options = {}) {
   const backend = options.backend ?? new StandaloneBackend({
     registryBaseUrl: options.registryBaseUrl ?? process.env.WEBLESS_REGISTRY_BASE_URL,
     secret: options.secret ?? process.env.WEBLESS_MCP_SECRET,
-    fetchImpl: options.fetchImpl
+    fetchImpl: options.fetchImpl,
+    trustedPrivateOrigins: options.trustedPrivateOrigins ?? (process.env.STANDALONE_TRUSTED_PRIVATE_ORIGINS ?? '').split(',').map(value => value.trim()).filter(Boolean)
   });
   const capabilitiesByDomain = new Map();
 
@@ -48,9 +49,19 @@ export function createStandaloneContext(options = {}) {
     return data.capabilities;
   };
 
-  const resourceContext = createDomainContext(async (domain, profile) => {
-    await loadCapabilities(domain, { google_id: profile.sub, email: profile.email });
-  });
+  // The central bootstrap first verifies Google proof and registry binding.
+  // Merchant calls must never run before that backend grant exists.
+  const resourceContext = createDomainContext(async () => {});
+  const accountRepository = new SlimWebBackendRepository({ transport: backend });
+  const bootstrapIdentity = accountRepository.bootstrapIdentity.bind(accountRepository);
+  accountRepository.bootstrapIdentity = async (input) => {
+    const authority = await bootstrapIdentity(input);
+    await loadCapabilities(input.resourceContext, {
+      google_id:authority.profile.sub,email:authority.profile.email,
+      backend_grant:authority.backend_grant,resource_context:input.resourceContext
+    });
+    return authority;
+  };
 
   return {
     oauthStore: options.oauthStore ?? {
@@ -58,7 +69,7 @@ export function createStandaloneContext(options = {}) {
       get: (kind, key) => backend.oauthState('GET', kind, key),
       take: (kind, key) => backend.oauthState('DELETE', kind, key)
     },
-    accountRepository: new SlimWebBackendRepository({ transport: backend }),
+    accountRepository,
     resourceContext,
     eventsResolver: async (identity) => (await loadCapabilities(identity.resource_context, identity)).includes('site_notifications_v1'),
     toolProfile: createCapabilityToolProfile(PHASE1_CAPABILITIES),

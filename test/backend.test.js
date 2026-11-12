@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { StandaloneBackend } from '../src/backend.js';
+import { StandaloneBackend, pinnedFetch } from '../src/backend.js';
+import { createServer } from 'node:http';
 
 function jsonResponse(status, payload, headers = {}) {
   return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json', ...headers } });
@@ -82,4 +83,76 @@ test('backend rejects arbitrary and redirected origins', async () => {
     backend.call('bad.example', { google_id: 'sub' }, 'slimweb_sites_list', 'backend_ai_assistant', 'GET', '/internal/mcp/v1/sites'),
     (error) => error.code === 'INSECURE_INSTANCE_REJECTED'
   );
+});
+
+test('backend rejects mapped IPv6 and mixed public/private DNS answers', async () => {
+  for (const addresses of [['::ffff:127.0.0.1'], ['::ffff:7f00:1'], ['93.184.216.34', '169.254.169.254'], ['64:ff9b::7f00:1'], ['2002:7f00:1::'], ['2001::7f00:1']]) {
+    let calls = 0;
+    const backend = new StandaloneBackend({registryBaseUrl: 'https://slimweb.tw', secret: 'x',
+      lookupImpl: async () => addresses.map(address => ({address, family: address.includes(':') ? 6 : 4})),
+      fetchImpl: async () => { calls++; return jsonResponse(200, {ok:true, data:{origin:'https://shop.example.com',token:'t'}}); }
+    });
+    await assert.rejects(backend.call('shop.example.com', {}, 't', 'p', 'GET', '/internal/mcp/v1/sites'), e => e.code === 'INSECURE_INSTANCE_REJECTED');
+    assert.equal(calls, 1);
+  }
+});
+
+test('backend binds connection lookup to the checked DNS answer without resolving twice', async () => {
+  let lookups = 0, calls = 0;
+  const backend = new StandaloneBackend({registryBaseUrl:'https://slimweb.tw',secret:'x',
+    lookupImpl:async () => [{address: ++lookups === 1 ? '93.184.216.34' : '127.0.0.1', family:4}],
+    fetchImpl:async (url, options) => {
+      if (++calls === 1) return jsonResponse(200,{ok:true,data:{origin:'https://shop.example.com',token:'t'}});
+      assert.equal(options.redirect, 'manual');
+      const address = await new Promise((resolve, reject) => options.lookup('shop.example.com', {}, (err, address) => err ? reject(err) : resolve(address)));
+      assert.equal(address, '93.184.216.34');
+      return jsonResponse(200,{ok:true,data:{}});
+    }
+  });
+  await backend.call('shop.example.com',{},'t','p','GET','/internal/mcp/v1/sites');
+  assert.equal(lookups,1);
+});
+
+test('private BOBO origin requires an exact operator-configured exception', async () => {
+  for (const [trustedPrivateOrigins, origin, allowed] of [
+    [[], 'http://192.168.0.188', false],
+    [['http://192.168.0.188'], 'http://192.168.0.188', true],
+    [['http://192.168.0.188'], 'http://192.168.0.189', false],
+    [['http://192.168.0.188'], 'http://192.168.0.188:8080', false],
+    [['http://192.168.0.188'], 'http://192.168.0.188/path', false]
+  ]) {
+    let calls=0;
+    const backend=new StandaloneBackend({registryBaseUrl:'https://slimweb.tw', secret:'x', trustedPrivateOrigins,
+      fetchImpl:async()=>jsonResponse(200,{ok:true,data:++calls===1?{origin,token:'t'}:{}})});
+    const request=backend.call('192.168.0.188',{},'t','p','GET','/internal/mcp/v1/sites');
+    if(allowed) await request;
+    else await assert.rejects(request,e=>e.code==='INSECURE_INSTANCE_REJECTED');
+    assert.equal(calls,allowed?2:1);
+  }
+});
+
+test('native transport connects using the supplied pin and does not follow redirects', async () => {
+  let hits = 0, lookups = 0;
+  const server = createServer((request, response) => {
+    hits++;
+    if (request.url === '/empty') { response.writeHead(204); response.end(); return; }
+    response.writeHead(302, {location: 'http://127.0.0.1/metadata'});
+    response.end('{}');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const response = await pinnedFetch(`http://does-not-exist.invalid:${server.address().port}/`, {
+      lookup: (hostname, options, callback) => {
+        lookups++;
+        assert.equal(hostname, 'does-not-exist.invalid');
+        if (options.all) callback(null, [{address: '127.0.0.1', family: 4}]);
+        else callback(null, '127.0.0.1', 4);
+      }
+    });
+    assert.equal(response.status, 302);
+    assert.equal(hits, 1);
+    assert.equal(lookups, 1);
+    const empty = await pinnedFetch(`http://127.0.0.1:${server.address().port}/empty`);
+    assert.equal(empty.status, 204);
+  } finally { await new Promise(resolve => server.close(resolve)); }
 });

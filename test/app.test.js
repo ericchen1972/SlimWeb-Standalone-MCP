@@ -1,3 +1,4 @@
+import {accessAfterLogin,testStore} from './authFixture.js';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { test } from 'node:test';
@@ -16,12 +17,20 @@ const SITE = {
 
 class FakeBackend {
   calls = [];
+  bootstrapCalls = [];
+
+  async bootstrapIdentity({credential, resourceContext}) {
+    assert.equal(credential, 'test');
+    this.bootstrapCalls.push({credential, resourceContext});
+    return {profile:{sub:'owner-sub',email:'owner@example.com',name:'Owner'},backend_grant:'independently-verified-fixture-grant'};
+  }
 
   constructor(capabilities = ['site_context', 'basic_settings_read', 'basic_settings_write']) {
     this.capabilities = capabilities;
   }
 
   async request({ identity, tool, permission, method, path, body, idempotencyKey }) {
+    assert.equal(identity.backend_grant,'independently-verified-fixture-grant');
     return this.call(identity.resource_context, identity, tool, permission, method, path, body, idempotencyKey);
   }
 
@@ -37,7 +46,7 @@ class FakeBackend {
 
 async function withServer(backend, run) {
   const handler = createRequestHandler({
-    ...createStandaloneContext({ backend }),
+    ...createStandaloneContext({ backend, oauthStore:testStore() }),
     sessionSecret: 'test-session-secret',
     publicBaseUrl: 'https://standalone-mcp.slimweb.tw',
     secureCookies: false,
@@ -67,7 +76,8 @@ test('Standalone shell binds login, five tools, and backend calls to one Domain'
     });
     const loginPayload = await login.json();
     assert.equal(login.status, 200);
-    const token = loginPayload.session.access_token;
+    assert.deepEqual(loginPayload.session,{authenticated:true});
+    const token = await accessAfterLogin(baseUrl,login);
 
     const listed = await mcp(baseUrl, token, '192.168.0.188', 'tools/list');
     assert.deepEqual(listed.payload.result.tools.map((tool) => tool.name), [
@@ -85,11 +95,12 @@ test('Standalone shell binds login, five tools, and backend calls to one Domain'
     const updated = await mcp(baseUrl, token, '192.168.0.188', 'tools/call', { name: 'slimweb_settings_update', arguments: { site_code: 'swcb_demo', name: 'Renamed' } });
     assert.equal(updated.payload.result.structuredContent.settings.name, 'Renamed');
     assert.ok(backend.calls.every((call) => call.domain === '192.168.0.188'));
+    assert.deepEqual(backend.bootstrapCalls,[{credential:'test',resourceContext:'192.168.0.188'}]);
 
     const beforeMismatch = backend.calls.length;
     const mismatch = await mcp(baseUrl, token, 'other.example.com', 'tools/list');
     assert.equal(mismatch.response.status, 401);
-    assert.equal(mismatch.payload.error.data.reason, 'DOMAIN_SESSION_MISMATCH');
+    assert.equal(mismatch.payload.error.data.reason, 'AUTH_REQUIRED');
     assert.equal(backend.calls.length, beforeMismatch);
   });
 });
@@ -106,7 +117,7 @@ test('Standalone tool list follows the capabilities returned by its Domain backe
     const login = await fetch(`${baseUrl}/auth/google?domain=shop.example.com`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ credential: 'test' })
     });
-    const token = (await login.json()).session.access_token;
+    const token = await accessAfterLogin(baseUrl,login);
     const listed = await mcp(baseUrl, token, 'shop.example.com', 'tools/list');
 
     assert.deepEqual(listed.payload.result.tools.map(({ name }) => name), [
@@ -130,7 +141,7 @@ test('Standalone exposes the complete core profile only for a full-contract back
     const login = await fetch(`${baseUrl}/auth/google?domain=shop.example.com`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ credential: 'test' })
     });
-    const token = (await login.json()).session.access_token;
+    const token = await accessAfterLogin(baseUrl,login);
     const listed = await mcp(baseUrl, token, 'shop.example.com', 'tools/list');
     const names = listed.payload.result.tools.map(({ name }) => name);
 
@@ -170,7 +181,7 @@ test('invoice tools require the installed backend invoice lifecycle capability',
     if (enabled) capabilities.push('invoice_lifecycle_v1');
     await withServer(new FakeBackend(capabilities), async baseUrl => {
       const login = await fetch(`${baseUrl}/auth/google?domain=shop.example.com`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ credential: 'test' }) });
-      const token = (await login.json()).session.access_token;
+      const token = await accessAfterLogin(baseUrl,login);
       const listed = await mcp(baseUrl, token, 'shop.example.com', 'tools/list');
       const invoiceTools = listed.payload.result.tools.filter(({name}) => name.startsWith('slimweb_invoice'));
       assert.equal(invoiceTools.length, enabled ? 9 : 0);
@@ -185,7 +196,7 @@ test('LINE tools require each installed backend capability even with full contra
     if(enabled) capabilities.push('line_bot_settings_read','line_rich_menus_write');
     await withServer(new FakeBackend(capabilities),async baseUrl=>{
       const login=await fetch(`${baseUrl}/auth/google?domain=shop.example.com`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({credential:'test'})});
-      const token=(await login.json()).session.access_token;
+      const token=await accessAfterLogin(baseUrl,login);
       const listed=await mcp(baseUrl,token,'shop.example.com','tools/list');
       const names=listed.payload.result.tools.filter(t=>t.name.startsWith('slimweb_line_')).map(t=>t.name);
       assert.equal(names.length,enabled?4:0);
@@ -204,7 +215,7 @@ test('site events require installed capability and retain Domain on subscription
   };
   await withServer(backend,async base=>{
    const login=await fetch(`${base}/auth/google?domain=shop.example.com`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({credential:'test'})});
-   const token=(await login.json()).session.access_token;
+   const token=await accessAfterLogin(base,login);
    const listed=await mcp(base,token,'shop.example.com','events/list');assert.equal(listed.payload.result.events.length,enabled?1:0);
    const p={name:'site.notification',arguments:{site_code:'swcb_demo'},delivery:{mode:'webhook',url:'https://receiver.example.com/callback',secret:'whsec_'+Buffer.alloc(32).toString('base64')}};
    const sub=await mcp(base,token,'shop.example.com','events/subscribe',p);
