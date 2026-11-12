@@ -35,6 +35,37 @@ export class StandaloneBackend {
     });
   }
 
+  bootstrapHumanApproval(input) {
+    return this.json(`${this.registryBaseUrl}/internal/mcp/v1/human-approvals/bootstrap`,{
+      method:'POST',headers:{'content-type':'application/json','X-SlimWeb-MCP-Secret':this.secret},
+      body:JSON.stringify({...input,target:'standalone'}),redirect:'manual'
+    });
+  }
+
+  previewHumanApproval(input) { return this.humanApprovalCall('preview',input); }
+  decideHumanApproval(input) { return this.humanApprovalCall('decide',input); }
+
+  async humanApprovalCall(action,{human_ticket,approval_id,site_code,decision}) {
+    if(!['preview','decide'].includes(action)||!/^[A-Za-z0-9_-]{43}$/.test(String(human_ticket))
+      ||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(approval_id)
+      ||!/^[A-Za-z0-9_-]{1,128}$/.test(site_code)||(action==='decide'&&!['approve','reject'].includes(decision))) {
+      throw new BackendError('Invalid human approval context.','HUMAN_APPROVAL_INVALID',400);
+    }
+    const path=`/internal/human-approvals/${approval_id}/${action}`;
+    const body=JSON.stringify(action==='decide'?{site_code,decision}:{site_code});
+    const scope=await this.json(`${this.registryBaseUrl}/internal/mcp/v1/human-approvals/proof`,{
+      method:'POST',headers:{'content-type':'application/json','X-SlimWeb-MCP-Secret':this.secret},
+      body:JSON.stringify({human_ticket,action,method:'POST',path,body_hash:createHash('sha256').update(body).digest('hex')}),redirect:'manual'
+    });
+    const origin=String(scope.origin??'');const target=await this.assertPublicOrigin(origin);
+    if(typeof scope.token!=='string'||!scope.token)throw new BackendError('Human approval proof is unavailable.','UPSTREAM_INVALID_RESPONSE',503);
+    // Human tickets stay in the registry. The customer receives only the short,
+    // request-bound proof with its distinct approval audience.
+    return this.json(`${origin}${path}`,{method:'POST',headers:{accept:'application/json','content-type':'application/json',authorization:`Bearer ${scope.token}`},body,redirect:'manual',lookup:(_host,options,callback)=>{
+      if(options?.all)callback(null,[target]);else callback(null,target.address,target.family);
+    }});
+  }
+
   async request({ identity, tool, permission, method = 'GET', path, body, idempotencyKey }) {
     const domain = String(identity?.resource_context ?? '').trim();
     if (domain === '') throw new BackendError('Standalone Domain context is required.', 'DOMAIN_REQUIRED');

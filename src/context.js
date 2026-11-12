@@ -64,6 +64,11 @@ export function createStandaloneContext(options = {}) {
   };
 
   return {
+    humanApprovalTransport: options.humanApprovalTransport ?? {
+      bootstrap: input=>backend.bootstrapHumanApproval(input),
+      preview: input=>backend.previewHumanApproval(input),
+      decide: input=>backend.decideHumanApproval(input)
+    },
     oauthStore: options.oauthStore ?? {
       put: (kind, key, value, expiresAt) => backend.oauthState('PUT', kind, key, { value, expires_at: expiresAt }),
       get: (kind, key) => backend.oauthState('GET', kind, key),
