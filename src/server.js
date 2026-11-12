@@ -44,6 +44,7 @@ export function createStandaloneRequestHandler(options = {}) {
       const domain = normalizeDomain(url.searchParams.get('domain'));
       const claims = verifyServiceAssertion(token, { ...assertionOptions, domain });
       request.headers.authorization = `Bearer ${createSignedToken({
+        typ: 'session',
         account_id: `standalone:${claims.instance_id}:${claims.sub || claims.email}`,
         email: claims.email,
         name: claims.name,

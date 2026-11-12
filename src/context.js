@@ -53,6 +53,11 @@ export function createStandaloneContext(options = {}) {
   });
 
   return {
+    oauthStore: options.oauthStore ?? {
+      put: (kind, key, value, expiresAt) => backend.oauthState('PUT', kind, key, { value, expires_at: expiresAt }),
+      get: (kind, key) => backend.oauthState('GET', kind, key),
+      take: (kind, key) => backend.oauthState('DELETE', kind, key)
+    },
     accountRepository: new SlimWebBackendRepository({ transport: backend }),
     resourceContext,
     eventsResolver: async (identity) => (await loadCapabilities(identity.resource_context, identity)).includes('site_notifications_v1'),

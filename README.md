@@ -38,3 +38,8 @@ LINE member push tools (Core v0.1.16): friends_stats, members_list, push_prepare
 
 ## Website notifications
 See [site.notification contract](docs/site-notification-contract.md). One website subscription delivers new-order and return-request notices only. Display in the subscribed chat and wait for user instructions before actions. Requires Work Cloud host support; actual UI acceptance is separate from server tests.
+# OAuth security update (2026-11-12)
+
+The updated Core requires persistent shared OAuth storage. This gateway stores registration, consent and one-time code state on the central Webless registry through its authenticated OAuth-state API; it does not store prelogin state on customer installations or request a customer bridge token before login. Deploy the registry API before updating this gateway/Core. Existing untyped sessions and access tokens require reconnecting, and clients must register exact callbacks, use S256 PKCE and complete browser consent.
+
+The gateway pins the immutable Core v0.1.26 release with its resolved commit in package-lock.json. Run npm ci and npm test to reproduce the released dependency. The central registry OAuth-state API must be live before this gateway is promoted.

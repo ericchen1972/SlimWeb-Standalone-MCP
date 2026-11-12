@@ -6,6 +6,18 @@ export class BackendError extends Error { constructor(message, code = 'UPSTREAM_
 export class StandaloneBackend {
   constructor({ registryBaseUrl, secret, fetchImpl = fetch, lookupImpl = lookup, timeoutMs = 15000 }) { this.registryBaseUrl = registryBaseUrl.replace(/\/+$/, ''); this.secret = secret; this.fetch = fetchImpl; this.lookup = lookupImpl; this.timeoutMs = timeoutMs; }
 
+  // OAuth registration happens before identity/domain authorization. Keep its
+  // shared state in the central registry, never behind a customer bridge token.
+  async oauthState(method, kind, key, body) {
+    const data = await this.json(`${this.registryBaseUrl}/internal/mcp/v1/oauth-state/${encodeURIComponent(kind)}/${encodeURIComponent(key)}`, {
+      method,
+      headers: { 'content-type': 'application/json', 'X-SlimWeb-MCP-Secret': this.secret },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      redirect: 'manual'
+    });
+    return data.value;
+  }
+
   async request({ identity, tool, permission, method = 'GET', path, body, idempotencyKey }) {
     const domain = String(identity?.resource_context ?? '').trim();
     if (domain === '') throw new BackendError('Standalone Domain context is required.', 'DOMAIN_REQUIRED');
