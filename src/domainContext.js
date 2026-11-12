@@ -19,7 +19,7 @@ export function createDomainContext(validate) {
     },
     async validateAfterIdentity(domain, identity) { await validate(domain, identity); return domain; },
     equals(left, right) { return left === right; },
-    appendToUrl(path, domain) { const url = new URL(path, 'https://local.invalid'); url.searchParams.set('domain', domain); return `${url.pathname}${url.search}`; },
+    appendToUrl(path, domain) { const url = new URL(path, 'https://local.invalid'); url.searchParams.set('domain', domain); return `${url.pathname}${url.search}${url.hash}`; },
     resourceUrl(base, domain) { return `${base.replace(/\/+$/, '')}/mcp?domain=${encodeURIComponent(domain)}`; }
   };
 }

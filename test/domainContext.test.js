@@ -26,3 +26,11 @@ test('Domain context reads OAuth resource parameter and keeps health unscoped', 
   assert.equal(context.parse(new URL('https://mcp.example/oauth/authorize?resource=https%3A%2F%2Fmcp.example%2Fmcp%3Fdomain%3Dshop.example.com')), 'shop.example.com');
   assert.equal(context.appendToUrl('/auth/login?next=%2Foauth%2Fauthorize', 'shop.example.com'), '/auth/login?next=%2Foauth%2Fauthorize&domain=shop.example.com');
 });
+
+test('Domain context keeps next query and fragment while replacing supplied domain', () => {
+  const context = createDomainContext(async () => {});
+  assert.equal(
+    context.appendToUrl('/oauth/authorize?client_id=client&domain=foreign.example#consent', 'shop.example.com'),
+    '/oauth/authorize?client_id=client&domain=shop.example.com#consent'
+  );
+});
