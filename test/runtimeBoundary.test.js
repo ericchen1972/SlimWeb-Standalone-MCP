@@ -10,9 +10,11 @@ test('runtime source contains no merchant persistence credentials', async () => 
   }
 });
 
-test('Cloud Run candidate deploy injects the SlimAI assertion trust set', async () => {
+test('Cloud Run candidate deploy preserves the existing SlimAI assertion trust set', async () => {
   const workflow = await readFile(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8');
-
-  assert.match(workflow, /STANDALONE_SLIMAI_ASSERTION_ISSUER=https:\/\/slimweb\.tw/);
-  assert.match(workflow, /STANDALONE_SLIMAI_ASSERTION_PUBLIC_KEYS_JSON=STANDALONE_SLIMAI_ASSERTION_PUBLIC_KEYS_JSON:latest/);
+  const deploy = await readFile(new URL('../scripts/deploy-preserving-runtime.mjs', import.meta.url), 'utf8');
+  assert.match(workflow, /deploy-preserving-runtime/);
+  assert.doesNotMatch(workflow, /--set-env-vars|--set-secrets/);
+  assert.match(deploy, /STANDALONE_SLIMAI_ASSERTION_ISSUER/);
+  assert.match(deploy, /STANDALONE_SLIMAI_ASSERTION_PUBLIC_KEYS_JSON/);
 });
