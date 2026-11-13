@@ -90,6 +90,12 @@ test('standalone OAuth consent and PKCE preserve domain, reject cross-domain ses
       code_challenge_method: 'S256',
       code_challenge: createHash('sha256').update(verifier).digest('base64url'),
     });
+    const prelogin = await fetch(base + '/oauth/authorize?' + params, {redirect: 'manual'});
+    assert.equal(prelogin.status, 302);
+    const loginUrl = new URL(prelogin.headers.get('location'), base);
+    assert.equal(loginUrl.pathname, '/auth/login');
+    assert.equal(loginUrl.searchParams.get('domain'), domain);
+    assert.equal((await fetch(loginUrl)).status, 200);
     const consent = await call('/oauth/authorize?' + params, {
       headers: { cookie },
     });
