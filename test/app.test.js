@@ -67,7 +67,7 @@ async function mcp(baseUrl, token, domain, method, params = undefined) {
   return { response, payload: await response.json() };
 }
 
-test('Standalone shell binds login, five tools, and backend calls to one Domain', async () => {
+test('Standalone shell binds login, six tools, and backend calls to one Domain', async () => {
   const backend = new FakeBackend();
   await withServer(backend, async (baseUrl) => {
     assert.equal((await fetch(`${baseUrl}/healthz`)).status, 200);
@@ -81,7 +81,7 @@ test('Standalone shell binds login, five tools, and backend calls to one Domain'
 
     const listed = await mcp(baseUrl, token, '192.168.0.188', 'tools/list');
     assert.deepEqual(listed.payload.result.tools.map((tool) => tool.name), [
-      'slimweb_auth_status', 'slimweb_sites_list', 'slimweb_site_select', 'slimweb_settings_get', 'slimweb_settings_update'
+      'slimweb_guides_get', 'slimweb_auth_status', 'slimweb_sites_list', 'slimweb_site_select', 'slimweb_settings_get', 'slimweb_settings_update'
     ]);
     const updateSchema = listed.payload.result.tools.find((tool) => tool.name === 'slimweb_settings_update').inputSchema;
     assert.deepEqual(Object.keys(updateSchema.properties), ['name', 'site_code']);
@@ -121,7 +121,7 @@ test('Standalone tool list follows the capabilities returned by its Domain backe
     const listed = await mcp(baseUrl, token, 'shop.example.com', 'tools/list');
 
     assert.deepEqual(listed.payload.result.tools.map(({ name }) => name), [
-      'slimweb_auth_status', 'slimweb_sites_list', 'slimweb_site_select',
+      'slimweb_guides_get', 'slimweb_auth_status', 'slimweb_sites_list', 'slimweb_site_select',
       'slimweb_site_readiness_get', 'slimweb_site_launch_progress_get',
       'slimweb_seo_settings_get', 'slimweb_seo_settings_update',
       'slimweb_contact_settings_get', 'slimweb_contact_settings_update',
@@ -224,4 +224,23 @@ test('site events require installed capability and retain Domain on subscription
    const mismatch=await mcp(base,token,'other.example.com','events/subscribe',p);assert.equal(mismatch.response.status,401);
   });
  }
+});
+
+
+test('thin Plugin guide reads preserve standalone domain binding without backend mutations', async () => {
+  const backend = new FakeBackend();
+  await withServer(backend, async baseUrl => {
+    const login = await fetch(baseUrl+'/auth/google?domain=shop.example.com',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({credential:'test'})});
+    const token = await accessAfterLogin(baseUrl,login);
+    const before = backend.calls.length;
+    const catalog = await mcp(baseUrl,token,'shop.example.com','tools/call',{name:'slimweb_guides_get',arguments:{topic:'index'}});
+    assert.equal(catalog.response.status,200);assert.equal(catalog.payload.error,undefined);
+    assert.ok(catalog.payload.result.structuredContent.topics.some(t=>t.topic==='overview'));
+    const guide = await mcp(baseUrl,token,'shop.example.com','tools/call',{name:'slimweb_guides_get',arguments:{topic:'overview'}});
+    assert.match(guide.payload.result.structuredContent.content,/SlimWeb/);
+    assert.equal(guide.payload.result.structuredContent.guide_version,catalog.payload.result.structuredContent.guide_version);
+    assert.equal(backend.calls.length,before,'guide calls do not reach merchant business APIs');
+    const mismatch=await mcp(baseUrl,token,'other.example.com','tools/call',{name:'slimweb_guides_get',arguments:{topic:'index'}});
+    assert.equal(mismatch.response.status,401);assert.equal(backend.calls.length,before);
+  });
 });

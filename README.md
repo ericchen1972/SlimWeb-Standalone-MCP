@@ -2,7 +2,7 @@
 
 Domain-scoped remote MCP shell for independent SlimWeb Standalone installations. It uses `@slimweb/mcp-core` for OAuth, sessions, protocol handling, and the public tool contract. Merchant reads and writes are performed only by the registered Standalone Laravel backend through short-lived RS256 Bridge Tokens.
 
-Backends that advertise the original Phase 1 capability set receive exactly five tools: authentication status, site list, site selection, basic-settings read, and website-name update. A backend receives the complete `@slimweb/mcp-core` tool profile only after it advertises `full_contract_v1` together with the required Phase 1 capabilities. This service has no merchant database, filesystem, FTP, GCS, or object-storage credentials.
+Backends that advertise the original Phase 1 capability set receive six tools: authentication status, deployed operating guides, site list, site selection, basic-settings read, and website-name update. A backend receives the complete `@slimweb/mcp-core` tool profile only after it advertises `full_contract_v1` together with the required Phase 1 capabilities. This service has no merchant database, filesystem, FTP, GCS, or object-storage credentials.
 
 For full-contract Theme work, Default is immutable. `slimweb_themes_create_from_default` creates a custom Theme without copying Default root storage, while `slimweb_themes_create_from_theme` clones only an explicit non-Default Theme shell/profile. Active custom Theme root/profile writes require `confirmed_active_theme_edit: true` after explicit user confirmation.
 
@@ -52,3 +52,8 @@ See [site.notification contract](docs/site-notification-contract.md). One websit
 The updated Core requires persistent shared OAuth storage. This gateway stores registration, consent and one-time code state on the central Webless registry through its authenticated OAuth-state API; it does not store prelogin state on customer installations or request a customer bridge token before login. Deploy the registry API before updating this gateway/Core. Existing untyped sessions and access tokens require reconnecting, and clients must register exact callbacks, use S256 PKCE and complete browser consent.
 
 The gateway pins the immutable Core v0.1.26 release with its resolved commit in package-lock.json. Run npm ci and npm test to reproduce the released dependency. The central registry OAuth-state API must be live before this gateway is promoted.
+
+
+## Thin Plugin operating guides (Core 0.1.33)
+
+Authenticated `slimweb_guides_get` provides the deployed index (`topic: index`), full overview and named topics with `guide_version` and content hashes. The normal `site_context` profile includes this read-only bootstrap. Explicit restricted tool profiles remain restricted; guidance does not grant business permissions or bypass Domain binding and backend capability discovery. Calls do not change site data. The thin local Skill retrieves current guides at each new task/topic; server guide deployments do not require routine Plugin reinstallation or Google reauthorization. The first migration requires updating the old full Skill once; new tool schemas may still require client refresh. Keep the full target MCP URL, including all Domain parameters.
