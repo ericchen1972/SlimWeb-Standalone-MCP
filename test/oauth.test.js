@@ -100,6 +100,7 @@ test('standalone OAuth consent and PKCE preserve domain, reject cross-domain ses
       headers: { cookie },
     });
     assert.equal(consent.status, 200);
+    assert.ok(consent.headers.get('content-security-policy').includes("form-action 'self' https://client.example;"), 'allow the registered callback origin in browser form redirects');
     const html = await consent.text();
     const consent_token = html.match(/name="consent_token" value="([^"]+)"/)[1];
     const approved = await call('/oauth/authorize', {
