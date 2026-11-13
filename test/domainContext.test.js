@@ -34,3 +34,13 @@ test('Domain context keeps next query and fragment while replacing supplied doma
     '/oauth/authorize?client_id=client&domain=shop.example.com#consent'
   );
 });
+
+test('only issuer discovery and registration can omit domain', () => {
+  const context = createDomainContext(async () => {});
+  for (const path of ['/.well-known/oauth-authorization-server', '/.well-known/oauth-authorization-server/mcp', '/mcp/.well-known/oauth-authorization-server', '/.well-known/openid-configuration', '/.well-known/openid-configuration/mcp', '/mcp/.well-known/openid-configuration', '/oauth/register']) {
+    assert.equal(context.parse(new URL('https://mcp.example' + path)), null);
+  }
+  for (const path of ['/mcp', '/auth/login', '/auth/google', '/oauth/authorize', '/oauth/token', '/oauth/revoke', '/.well-known/oauth-protected-resource/mcp']) {
+    assert.throws(() => context.parse(new URL('https://mcp.example' + path)), {code: 'DOMAIN_REQUIRED'});
+  }
+});

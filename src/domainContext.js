@@ -15,6 +15,17 @@ export function createDomainContext(validate) {
       if (!value && url.searchParams.get('resource')) {
         try { value = new URL(url.searchParams.get('resource')).searchParams.get('domain'); } catch {}
       }
+      // Issuer discovery and client registration are shared public operations.
+      // Resource metadata, login, consent and tokens remain domain-scoped.
+      if (!value && [
+        '/.well-known/oauth-authorization-server',
+        '/.well-known/oauth-authorization-server/mcp',
+        '/mcp/.well-known/oauth-authorization-server',
+        '/.well-known/openid-configuration',
+        '/.well-known/openid-configuration/mcp',
+        '/mcp/.well-known/openid-configuration',
+        '/oauth/register'
+      ].includes(url.pathname)) return null;
       return normalizeDomain(value);
     },
     async validateAfterIdentity(domain, identity) { await validate(domain, identity); return domain; },

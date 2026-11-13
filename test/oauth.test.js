@@ -72,17 +72,21 @@ test('standalone OAuth consent and PKCE preserve domain, reject cross-domain ses
     body: JSON.stringify(body),
   });
   try {
+    const metadata = await fetch(base + '/.well-known/oauth-authorization-server');
+    assert.equal(metadata.status, 200);
+    assert.equal((await metadata.json()).authorization_endpoint, 'https://standalone-mcp.example/oauth/authorize');
     const login = await call('/auth/google', post({ credential: 'test' }));
     const cookie = login.headers.get('set-cookie');
     const redirect = 'https://client.example/callback';
     const client = await (
-      await call('/oauth/register', post({ redirect_uris: [redirect] }))
+      await fetch(base + '/oauth/register', post({ redirect_uris: [redirect] }))
     ).json();
     const verifier = 'v'.repeat(43);
     const params = new URLSearchParams({
       client_id: client.client_id,
       redirect_uri: redirect,
       response_type: 'code',
+      resource: 'https://standalone-mcp.example/mcp?domain=' + domain,
       code_challenge_method: 'S256',
       code_challenge: createHash('sha256').update(verifier).digest('base64url'),
     });
@@ -100,18 +104,23 @@ test('standalone OAuth consent and PKCE preserve domain, reject cross-domain ses
     const code = new URL(approved.headers.get('location')).searchParams.get(
       'code',
     );
-    const tokenResponse = await call(
-      '/oauth/token',
-      post({
-        grant_type: 'authorization_code',
-        code,
-        client_id: client.client_id,
-        redirect_uri: redirect,
-        code_verifier: verifier,
-      }),
+    const exchange = {
+      grant_type: 'authorization_code',
+      resource: 'https://standalone-mcp.example/mcp?domain=' + domain,
+      code, client_id: client.client_id, redirect_uri: redirect, code_verifier: verifier,
+    };
+    const form = value => ({method: 'POST', headers: {'content-type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams(value)});
+    assert.equal((await fetch(base + '/oauth/token?domain=other.example', form(exchange))).status, 400);
+    const tokenResponse = await fetch(
+      base + '/oauth/token',
+      form(exchange),
     );
     assert.equal(tokenResponse.status, 200);
-    const token = (await tokenResponse.json()).access_token;
+    const pair = await tokenResponse.json();
+    assert.equal((await fetch(base + '/oauth/token', form(exchange))).status, 400);
+    const refresh = await fetch(base + '/oauth/token', form({grant_type: 'refresh_token', client_id: client.client_id, refresh_token: pair.refresh_token, resource: exchange.resource}));
+    assert.equal(refresh.status, 200);
+    const token = (await refresh.json()).access_token;
     const headers = {
       'content-type': 'application/json',
       authorization: 'Bearer ' + token,
@@ -135,6 +144,8 @@ test('standalone OAuth consent and PKCE preserve domain, reject cross-domain ses
       ).status,
       401,
     );
+    assert.equal((await fetch(base + '/oauth/revoke', form({client_id: client.client_id, token, resource: exchange.resource}))).status, 200);
+    assert.equal((await call('/mcp', {method: 'POST', headers, body: message})).status, 401);
   } finally {
     server.closeAllConnections();
     await new Promise((r) => server.close(r));
